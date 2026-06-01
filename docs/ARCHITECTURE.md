@@ -38,10 +38,10 @@ graph TD
 
 | Pipeline | Approche | Justification |
 |----------|----------|---------------|
-| catalog_ingestion | ETL | ... |
-| streaming_events | ... | ... |
-| aggregation | ... | ... |
-| streaming_trends (Spark) | ... | ... |
+| `catalog_ingestion` | **ETL** | Les JSONs bruts de MinIO sont extraits, transformés dans Airflow (normalisation noms artistes, validation durées, alignement genres) avant d'être chargés en PostgreSQL |
+| `streaming_events` | **ETL** | Les événements Redis sont validés et enrichis (join catalog : track_id → artiste/genre) dans Airflow avant insertion en PostgreSQL et Parquet |
+| `aggregation` | **ELT** | Les données sont déjà en PostgreSQL. Les agrégats (top 50, artist_stats, métriques P2P) sont calculés directement par SQL dans la base — aucune transformation externe |
+| `streaming_trends` (Spark) | **ELT** | Spark charge les événements depuis Kafka (Extract + Load en mémoire), applique les agrégations sur fenêtres temporelles (Transform dans le moteur), puis écrit en PostgreSQL |
 
 ### Partitionnement Parquet
 

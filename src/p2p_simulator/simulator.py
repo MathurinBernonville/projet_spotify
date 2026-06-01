@@ -190,9 +190,11 @@ class P2PSimulator:
         # self._publish_to_kafka(channel, event.get("user_id", ""), payload)
 
     def _publish_to_redis(self, channel: str, payload: str):
-        """Publie payload dans le channel Redis via pub/sub."""
+        """Publie payload dans le channel Redis via pub/sub et dans une LIST pour le batch."""
         try:
             self.redis.publish(channel, payload)
+            self.redis.lpush(f"{channel}_buffer", payload)
+            self.redis.ltrim(f"{channel}_buffer", 0, 9999)
         except Exception as e:
             logger.error("Redis indisponible, event ignoré : %s", e)
 

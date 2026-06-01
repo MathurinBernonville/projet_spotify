@@ -1,0 +1,97 @@
+{
+  "artists": [
+    {
+      "id": "artist-020",
+      "name": "urban rebel",
+      "country": "USA",
+      "label": "Urban Pulse",
+      "genres": ["Hip-Hop", "Rap"],
+      "monthly_listeners": 350000
+    },
+    {
+      "id": "artist-021",
+      "name": "city beats",
+      "country": "France",
+      "label": "Urban Pulse",
+      "genres": ["Hip-Hop", "R&B"],
+      "monthly_listeners": 280000
+    },
+    {
+      "id": "artist-022",
+      "name": "street flow",
+      "country": "Brazil",
+      "label": "Urban Pulse",
+      "genres": ["Rap", "Funk"],
+      "monthly_listeners": 220000
+    }
+  ],
+  "albums": [
+    {
+      "id": "album-020",
+      "artist_id": "artist-020",
+      "title": "Urban Renaissance",
+      "release_year": 2024,
+      "total_tracks": 14
+    },
+    {
+      "id": "album-021",
+      "artist_id": "artist-021",
+      "title": "City Lights",
+      "release_year": 2023,
+      "total_tracks": 12
+    },
+    {
+      "id": "album-022",
+      "artist_id": "artist-022",
+      "title": "Street Wisdom",
+      "release_year": 2024,
+      "total_tracks": 10
+    }
+  ],
+  "tracks": [
+    {
+      "id": "track-020",
+      "album_id": "album-020",
+      "artist_id": "artist-020",
+      "title": "Rise Up",
+      "duration_ms": 234000,
+      "genre": "Hip-Hop",
+      "bpm": 92,
+      "explicit": true,
+      "audio_file_path": "s3://spotify-audio/track-020.mp3"
+    },
+    {
+      "id": "track-021",
+      "album_id": "album-020",
+      "artist_id": "artist-020",
+      "title": "City Anthem",
+      "duration_ms": 278000,
+      "genre": "Rap",
+      "bpm": 100,
+      "explicit": true,
+      "audio_file_path": "s3://spotify-audio/track-021.mp3"
+    },
+    {
+      "id": "track-022",
+      "album_id": "album-021",
+      "artist_id": "artist-021",
+      "title": "Paris Nights",
+      "duration_ms": 245000,
+      "genre": "Hip-Hop",
+      "bpm": 95,
+      "explicit": false,
+      "audio_file_path": "s3://spotify-audio/track-022.mp3"
+    },
+    {
+      "id": "track-023",
+      "album_id": "album-022",
+      "artist_id": "artist-022",
+      "title": "Favela Dreams",
+      "duration_ms": 289000,
+      "genre": "Funk",
+      "bpm": 125,
+      "explicit": true,
+      "audio_file_path": "s3://spotify-audio/track-023.mp3"
+    }
+  ]
+}

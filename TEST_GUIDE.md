@@ -1,210 +1,208 @@
-# 🧪 Guide de test du DAG `catalog_ingestion_pipeline`
+# Testing Guide for catalog_ingestion_pipeline DAG
 
-Ce guide explique comment tester localement l'implémentation du DAG `catalog_ingestion_pipeline`.
+This guide explains how to test locally the implementation of the `catalog_ingestion_pipeline` DAG.
 
-## 📋 Prérequis
+## Prerequisites
 
-- ✅ Docker et Docker Compose installés
-- ✅ Python 3.8+ (pour le script d'upload)
-- ✅ boto3 installé (optionnel : `pip install boto3`)
+- Docker and Docker Compose installed
+- Python 3.8+ (for upload script)
+- boto3 installed (optional: `pip install boto3`)
 
-## 🚀 Démarrage rapide
+## Quick Start
 
-### Option 1 : Script automatisé (recommandé)
+### Option 1: Automated script (recommended)
 
 ```bash
-# Depuis la racine du projet
+# From project root
 ./start_and_test.sh
 ```
 
-Ce script :
+This script:
 
-1. ✅ Arrête les conteneurs existants
-2. ✅ Démarre docker-compose
-3. ✅ Attend que tous les services soient prêts (PostgreSQL, MinIO, Airflow)
-4. ✅ Upload les fichiers JSON de test dans MinIO
-5. ✅ Affiche les URLs d'accès
+1. Stops existing containers
+2. Starts docker-compose
+3. Waits for all services to be ready (PostgreSQL, MinIO, Airflow)
+4. Uploads test JSON files to MinIO
+5. Displays access URLs
 
-### Option 2 : Manuel
+### Option 2: Manual
 
 ```bash
-# 1. Démarrer Docker Compose
+# 1. Start Docker Compose
 docker-compose up -d
 
-# 2. Attendre 60-90 secondes
+# 2. Wait 60-90 seconds
 
-# 3. Upload les données (si boto3 est installé)
+# 3. Upload data (if boto3 is installed)
 python3 upload_to_minio.py
 
-# 4. Accéder à Airflow
+# 4. Access Airflow
 open http://localhost:8080
 ```
 
-## 📊 Services disponibles
+## Available Services
 
-Une fois démarrés, les services sont accessibles sur :
+Once started, services are accessible at:
 
-| Service           | URL                   | Credentials             |
-| ----------------- | --------------------- | ----------------------- |
-| **Airflow UI**    | http://localhost:8080 | admin / admin           |
-| **MinIO Console** | http://localhost:9001 | minioadmin / minioadmin |
-| **PostgreSQL**    | localhost:5432        | spotify / spotify       |
-| **Redis**         | localhost:6379        | -                       |
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| Airflow UI | http://localhost:8080 | admin / admin |
+| MinIO Console | http://localhost:9001 | minioadmin / minioadmin |
+| PostgreSQL | localhost:5432 | spotify / spotify |
+| Redis | localhost:6379 | - |
 
-## 🔍 Vérification du DAG
+## DAG Verification
 
-### 1. Vérifier que le DAG se charge
+### 1. Verify DAG loads correctly
 
 ```bash
-# Dans l'UI Airflow, aller dans "DAGs"
-# Chercher "catalog_ingestion_pipeline"
-# Vérifier qu'il n'y a pas d'erreur de syntaxe
+# In Airflow UI, go to "DAGs" section
+# Search for "catalog_ingestion_pipeline"
+# Verify there are no syntax errors
 ```
 
-### 2. Lancer une première exécution
+### 2. Trigger first execution
 
-1. Cliquez sur le DAG `catalog_ingestion_pipeline`
-2. Cliquez sur le bouton **"Trigger DAG"**
-3. Attendez que l'exécution commence (visible dans le "DAG Runs")
+1. Click on `catalog_ingestion_pipeline` DAG
+2. Click "Trigger DAG" button
+3. Wait for execution to start (visible in "DAG Runs")
 
-### 3. Vérifier les logs
+### 3. Check logs
 
 ```bash
-# Option A : Via la UI Airflow
-# Cliquez sur le DAG run → Graph → cliquez sur chaque task → "Logs"
+# Option A: Via Airflow UI
+# Click on DAG run -> Graph -> click each task -> "Logs"
 
-# Option B : Via le terminal
+# Option B: Via terminal
 docker-compose logs -f airflow-scheduler
 docker-compose logs -f airflow-worker
 ```
 
-### 4. Vérifier le résultat en DLQ (optionnel)
+### 4. Verify DLQ entries (optional)
 
 ```bash
-# Connectez-vous à PostgreSQL
+# Connect to PostgreSQL
 docker exec -it cours_hetic-postgres-1 psql -U spotify -d spotify -c \
   "SELECT id, error_type, error_message FROM dead_letter_events LIMIT 5;"
 ```
 
-### 5. Vérifier les données insérées
+### 5. Verify inserted data
 
 ```bash
-# Voir les artistes insérés
+# Check artists inserted
 docker exec -it cours_hetic-postgres-1 psql -U spotify -d spotify -c \
   "SELECT id, name, label, monthly_listeners FROM artists LIMIT 10;"
 
-# Voir les tracks insérées
+# Check tracks inserted
 docker exec -it cours_hetic-postgres-1 psql -U spotify -d spotify -c \
   "SELECT id, title, duration_ms, genre FROM tracks LIMIT 10;"
 ```
 
-## 🔄 Tester l'idempotence
+## Test Idempotence
 
-L'idempotence signifie que relancer le même DAG 2 fois doit produire le même résultat.
+Idempotence means running the same DAG twice produces the same result.
 
 ```bash
-# 1. Relancer le DAG une 2ème fois
-# (Depuis l'UI : Trigger DAG)
+# 1. Trigger DAG second time
+# (From UI: Trigger DAG)
 
-# 2. Vérifier les logs du XCom
-# Les valeurs "tracks_inserted", "artists_inserted" doivent être identiques
+# 2. Check XCom values
+# Values for "tracks_inserted", "artists_inserted" should be identical
 
-# Ou en SQL :
+# Or via SQL:
 docker exec -it cours_hetic-postgres-1 psql -U spotify -d spotify -c \
   "SELECT COUNT(*) FROM tracks WHERE created_at > NOW() - INTERVAL '10 minutes';"
 ```
 
-## 📁 Fichiers de test
+## Test Data
 
-Les fichiers JSON de test se trouvent dans `test_data/` :
+Test JSON files are in `test_data/`:
 
-- `sunset_records.json` : 3 artistes, 3 albums, 4 tracks
-- `nightwave_music.json` : 3 artistes, 3 albums, 4 tracks
-- `urban_pulse.json` : 3 artistes, 3 albums, 4 tracks
+- `sunset_records.json`: 3 artists, 3 albums, 4 tracks
+- `nightwave_music.json`: 3 artists, 3 albums, 4 tracks
+- `urban_pulse.json`: 3 artists, 3 albums, 4 tracks
 
-**Total : 9 artistes, 9 albums, 12 tracks**
+Total: 9 artists, 9 albums, 12 tracks
 
-## 🧹 Arrêter et nettoyer
+## Cleanup
 
 ```bash
-# Arrêter les conteneurs
+# Stop containers
 docker-compose down
 
-# Nettoyer aussi les volumes (attention : supprime les données)
+# Clean volumes (warning: deletes data)
 docker-compose down -v
 ```
 
-## 📋 Checklist de validation
+## Validation Checklist
 
-Cochez les éléments au fur et à mesure :
-
-- [ ] Docker-compose démarre sans erreur
-- [ ] MinIO contient les 3 JSONs (visible dans MinIO Console)
-- [ ] DAG `catalog_ingestion_pipeline` se charge sans erreur
-- [ ] Premier DAG run s'affiche en **vert** ✅
-- [ ] Logs : toutes les 5 tâches ont exécuté avec succès
+- [ ] Docker-compose starts without errors
+- [ ] MinIO contains 3 JSONs (visible in MinIO Console)
+- [ ] DAG `catalog_ingestion_pipeline` loads without error
+- [ ] First DAG run displays in green
+- [ ] Logs: all 5 tasks executed successfully
 - [ ] XCom `tracks_inserted` > 0
-- [ ] PostgreSQL contient les 12 tracks insérées
-- [ ] Deuxième DAG run : same result ✅ (idempotence)
-- [ ] Pas d'erreurs en DLQ (ou un nombre prévisible)
+- [ ] PostgreSQL contains 12 inserted tracks
+- [ ] Second DAG run: same result (idempotence)
+- [ ] No errors in DLQ (or predictable number)
 
-## 🐛 Dépannage
+## Troubleshooting
 
-### MinIO dit "connexion refusée"
+### MinIO connection refused
 
 ```bash
-# Attendre plus longtemps
+# Wait longer
 sleep 30
 docker-compose logs minio
 ```
 
-### PostgreSQL dit "accès refusé"
+### PostgreSQL access denied
 
 ```bash
-# Vérifier que PostgreSQL est démarré
+# Check PostgreSQL started
 docker-compose ps | grep postgres
 
-# Vérifier la base de données
+# Check database
 docker exec -it cours_hetic-postgres-1 psql -U airflow -l
 ```
 
-### Airflow dit "DAG import error"
+### Airflow DAG import error
 
 ```bash
-# Vérifier la syntaxe Python du DAG
+# Check Python syntax
 python3 -m py_compile dags/catalog_ingestion_pipeline.py
 
-# Voir les erreurs complètes
+# Check detailed errors
 docker-compose logs airflow-init
 docker-compose logs airflow-scheduler
 ```
 
-### Fichiers JSON non uploadés
+### JSON files not uploaded
 
 ```bash
-# Vérifier que boto3 est installé
+# Verify boto3 installed
 pip install boto3
 
-# Upload manuel
+# Manual upload
 python3 upload_to_minio.py
 ```
 
-## 📚 Ressources
+## Resources
 
-- [Documentation Apache Airflow](https://airflow.apache.org/)
-- [Documentation MinIO S3 API](https://docs.min.io/minio/baremetal/reference/minio-server/minio-server.html)
-- [Documentation PostgreSQL](https://www.postgresql.org/docs/)
+- Apache Airflow Documentation: https://airflow.apache.org/
+- MinIO S3 API: https://docs.min.io/
+- PostgreSQL Documentation: https://www.postgresql.org/docs/
 
-## ✅ Résultats attendus
+## Expected Results
 
-Une fois le DAG exécuté avec succès :
+Once DAG executes successfully:
 
 ```
-✅ catalog_ingestion_pipeline terminé
-DAGRun : 2026-06-02T00:00:00+00:00
-Tracks insérées  : 12
-Artists insérés  : 9
-Erreurs DLQ      : 0
+catalog_ingestion_pipeline completed
+DAGRun: 2026-06-02T00:00:00+00:00
+Tracks inserted: 12
+Artists inserted: 9
+DLQ errors: 0
 ```
 
-**Fin ! 🎉**
+Done!

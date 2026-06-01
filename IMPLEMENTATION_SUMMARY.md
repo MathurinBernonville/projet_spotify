@@ -1,38 +1,38 @@
-# 📋 Résumé : Implementation et Test du DAG `catalog_ingestion_pipeline`
+# Implementation Summary: catalog_ingestion_pipeline DAG
 
-## 🎯 Objectif
+## Objective
 
-Implémenter le DAG `catalog_ingestion_pipeline` (#4) avec toutes les 5 tâches et créer une infrastructure complète pour tester l'idempotence.
-
----
-
-## ✅ Travail complété
-
-### 1️⃣ **Implémentation du DAG** (Commit `5f110e9`)
-
-Fichier modifié : `dags/catalog_ingestion_pipeline.py`
-
-#### 5 tâches implémentées :
-
-| Tâche | Implémentation | Validations |
-|-------|---|---|
-| **extract_from_minio()** | Connexion boto3, téléchargement 3 JSONs | Gestion erreurs, logging |
-| **validate_schema()** | Vérification champs obligatoires | Envoi en DLQ, compteur erreurs |
-| **transform_catalog()** | Normalisation noms artistes, déduplication | Validation durées tracks |
-| **load_to_postgres()** | Upsert `ON CONFLICT DO UPDATE` | Idempotence garantie |
-| **notify_success()** | Log statistiques + XCom push | Monitoring |
-
-#### Points clés :
-
-✅ **Idempotence** : Upserts avec `ON CONFLICT` pour PostgreSQL
-✅ **Gestion d'erreurs** : Entrées invalides → DLQ
-✅ **XCom monitoring** : Statistiques d'ingestion poussées
-✅ **Logging détaillé** : Traçabilité complète
-✅ **Syntaxe Python valide** : Aucune `NotImplementedError`
+Implement the DAG `catalog_ingestion_pipeline` (#4) with all 5 tasks and create a complete infrastructure to test idempotence.
 
 ---
 
-### 2️⃣ **Infrastructure de test** (Commit `1c61754`)
+## Completed Work
+
+### 1. DAG Implementation (Commit 5f110e9)
+
+File modified: `dags/catalog_ingestion_pipeline.py`
+
+#### 5 Tasks Implemented:
+
+| Task | Implementation | Validation |
+|------|---|---|
+| extract_from_minio() | boto3 connection, download 3 JSONs | Error handling, logging |
+| validate_schema() | Check required fields | Send to DLQ, error count |
+| transform_catalog() | Normalize artist names, deduplication | Track duration validation |
+| load_to_postgres() | Upsert ON CONFLICT DO UPDATE | Guaranteed idempotence |
+| notify_success() | Log statistics + XCom push | Monitoring |
+
+#### Key Points:
+
+- Idempotence: Upserts with ON CONFLICT for PostgreSQL
+- Error handling: Invalid entries to DLQ
+- XCom monitoring: Ingestion statistics pushed
+- Detailed logging: Complete traceability
+- Valid Python syntax: No NotImplementedError
+
+---
+
+### 2. Test Infrastructure (Commit 1c61754)
 
 #### Fichiers créés :
 
@@ -65,11 +65,13 @@ Fichier modifié : `dags/catalog_ingestion_pipeline.py`
 ## 🚀 Pour tester
 
 ### Option 1 : Automatique (recommandé)
+
 ```bash
 ./start_and_test.sh
 ```
 
 ### Option 2 : Manuel
+
 ```bash
 docker-compose up -d
 sleep 60
@@ -81,11 +83,11 @@ open http://localhost:8080
 
 ## 📊 Accès aux services
 
-| Service | URL | Identifiants |
-|---------|-----|--------------|
-| **Airflow UI** | http://localhost:8080 | admin / admin |
+| Service           | URL                   | Identifiants            |
+| ----------------- | --------------------- | ----------------------- |
+| **Airflow UI**    | http://localhost:8080 | admin / admin           |
 | **MinIO Console** | http://localhost:9001 | minioadmin / minioadmin |
-| **PostgreSQL** | localhost:5432 | spotify / spotify |
+| **PostgreSQL**    | localhost:5432        | spotify / spotify       |
 
 ---
 

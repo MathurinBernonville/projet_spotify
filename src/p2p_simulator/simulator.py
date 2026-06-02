@@ -54,11 +54,28 @@ EVENT_SOURCES = ["p2p", "p2p", "p2p", "direct", "cache"]  # pondéré : 60% P2P
 # DONNÉES SIMULÉES
 # ─────────────────────────────────────────────────────────────
 
-SAMPLE_TRACKS = [
-    {"id": str(uuid.uuid4()), "title": f"Track {i}", "duration_ms": random.randint(120000, 300000)}
-    for i in range(50)
-]
+def _load_tracks_from_postgres():
+    try:
+        import psycopg2
+        conn = psycopg2.connect(
+            host="localhost", port=5432,
+            dbname="spotify", user="spotify", password="spotify"
+        )
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, title, duration_ms FROM tracks LIMIT 200")
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        if rows:
+            return [{"id": str(r[0]), "title": r[1], "duration_ms": r[2]} for r in rows]
+    except Exception as e:
+        logger.warning("Impossible de charger les tracks depuis PostgreSQL : %s", e)
+    return [
+        {"id": str(uuid.uuid4()), "title": f"Track {i}", "duration_ms": random.randint(120000, 300000)}
+        for i in range(50)
+    ]
 
+SAMPLE_TRACKS = _load_tracks_from_postgres()
 SAMPLE_USERS = [str(uuid.uuid4()) for _ in range(200)]
 SAMPLE_PEERS = [str(uuid.uuid4()) for _ in range(20)]
 

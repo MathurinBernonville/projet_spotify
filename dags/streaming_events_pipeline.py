@@ -167,7 +167,7 @@ with DAG(
 
         track_ids = list({e["track_id"] for e in events})
         cursor.execute(
-            "SELECT id, title, artist_id, genre FROM tracks WHERE id = ANY(%s)",
+            "SELECT id, title, artist_id, genre FROM tracks WHERE id = ANY(%s::uuid[])",
             (track_ids,)
         )
         rows = cursor.fetchall()

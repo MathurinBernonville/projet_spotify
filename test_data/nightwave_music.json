@@ -1,0 +1,97 @@
+{
+  "artists": [
+    {
+      "id": "artist-010",
+      "name": "midnight echo",
+      "country": "Canada",
+      "label": "NightWave Music",
+      "genres": ["Synthwave", "Electronic"],
+      "monthly_listeners": 200000
+    },
+    {
+      "id": "artist-011",
+      "name": "neon lights",
+      "country": "Japan",
+      "label": "NightWave Music",
+      "genres": ["Synthwave", "Darkwave"],
+      "monthly_listeners": 175000
+    },
+    {
+      "id": "artist-012",
+      "name": "digital dreams",
+      "country": "Germany",
+      "label": "NightWave Music",
+      "genres": ["Electronic", "Industrial"],
+      "monthly_listeners": 95000
+    }
+  ],
+  "albums": [
+    {
+      "id": "album-010",
+      "artist_id": "artist-010",
+      "title": "Nocturnal Vibes",
+      "release_year": 2024,
+      "total_tracks": 11
+    },
+    {
+      "id": "album-011",
+      "artist_id": "artist-011",
+      "title": "Neon Nights",
+      "release_year": 2023,
+      "total_tracks": 13
+    },
+    {
+      "id": "album-012",
+      "artist_id": "artist-012",
+      "title": "Digital Odyssey",
+      "release_year": 2024,
+      "total_tracks": 9
+    }
+  ],
+  "tracks": [
+    {
+      "id": "track-010",
+      "album_id": "album-010",
+      "artist_id": "artist-010",
+      "title": "Midnight Echo",
+      "duration_ms": 256000,
+      "genre": "Synthwave",
+      "bpm": 128,
+      "explicit": false,
+      "audio_file_path": "s3://spotify-audio/track-010.mp3"
+    },
+    {
+      "id": "track-011",
+      "album_id": "album-010",
+      "artist_id": "artist-010",
+      "title": "Void",
+      "duration_ms": 289000,
+      "genre": "Electronic",
+      "bpm": 110,
+      "explicit": false,
+      "audio_file_path": "s3://spotify-audio/track-011.mp3"
+    },
+    {
+      "id": "track-012",
+      "album_id": "album-011",
+      "artist_id": "artist-011",
+      "title": "Neon City",
+      "duration_ms": 223000,
+      "genre": "Synthwave",
+      "bpm": 135,
+      "explicit": false,
+      "audio_file_path": "s3://spotify-audio/track-012.mp3"
+    },
+    {
+      "id": "track-013",
+      "album_id": "album-012",
+      "artist_id": "artist-012",
+      "title": "Digital Sunset",
+      "duration_ms": 267000,
+      "genre": "Electronic",
+      "bpm": 115,
+      "explicit": false,
+      "audio_file_path": "s3://spotify-audio/track-013.mp3"
+    }
+  ]
+}

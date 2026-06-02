@@ -1,0 +1,97 @@
+{
+  "artists": [
+    {
+      "id": "artist-001",
+      "name": "sunset vibes",
+      "country": "USA",
+      "label": "SunSet Records",
+      "genres": ["Electronic", "Ambient"],
+      "monthly_listeners": 150000
+    },
+    {
+      "id": "artist-002",
+      "name": "golden hour",
+      "country": "UK",
+      "label": "SunSet Records",
+      "genres": ["Indie", "Pop"],
+      "monthly_listeners": 85000
+    },
+    {
+      "id": "artist-003",
+      "name": "ocean waves",
+      "country": "Australia",
+      "label": "SunSet Records",
+      "genres": ["Electronic"],
+      "monthly_listeners": 120000
+    }
+  ],
+  "albums": [
+    {
+      "id": "album-001",
+      "artist_id": "artist-001",
+      "title": "Twilight Dreams",
+      "release_year": 2024,
+      "total_tracks": 12
+    },
+    {
+      "id": "album-002",
+      "artist_id": "artist-002",
+      "title": "Sunset Boulevard",
+      "release_year": 2023,
+      "total_tracks": 10
+    },
+    {
+      "id": "album-003",
+      "artist_id": "artist-003",
+      "title": "Blue Horizons",
+      "release_year": 2024,
+      "total_tracks": 8
+    }
+  ],
+  "tracks": [
+    {
+      "id": "track-001",
+      "album_id": "album-001",
+      "artist_id": "artist-001",
+      "title": "Dusk",
+      "duration_ms": 245000,
+      "genre": "Electronic",
+      "bpm": 110,
+      "explicit": false,
+      "audio_file_path": "s3://spotify-audio/track-001.mp3"
+    },
+    {
+      "id": "track-002",
+      "album_id": "album-001",
+      "artist_id": "artist-001",
+      "title": "Starlight",
+      "duration_ms": 287000,
+      "genre": "Ambient",
+      "bpm": 85,
+      "explicit": false,
+      "audio_file_path": "s3://spotify-audio/track-002.mp3"
+    },
+    {
+      "id": "track-003",
+      "album_id": "album-002",
+      "artist_id": "artist-002",
+      "title": "Golden Hour",
+      "duration_ms": 198000,
+      "genre": "Indie",
+      "bpm": 95,
+      "explicit": false,
+      "audio_file_path": "s3://spotify-audio/track-003.mp3"
+    },
+    {
+      "id": "track-004",
+      "album_id": "album-003",
+      "artist_id": "artist-003",
+      "title": "Ocean Dreams",
+      "duration_ms": 312000,
+      "genre": "Electronic",
+      "bpm": 120,
+      "explicit": false,
+      "audio_file_path": "s3://spotify-audio/track-004.mp3"
+    }
+  ]
+}

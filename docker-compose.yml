@@ -246,7 +246,8 @@ services:
   # ─────────────────────────────────────────
 
   spark-master:
-    image: bitnami/spark:3.5
+    image: apache/spark:3.5.1
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
     environment:
       SPARK_MODE: master
       SPARK_MASTER_PORT: 7077
@@ -255,8 +256,11 @@ services:
       - "7077:7077"
       - "8888:8888"
     volumes:
-      - ./spark_jobs:/opt/spark-jobs  spark-worker-1:
-    image: bitnami/spark:3.5
+      - ./spark_jobs:/opt/spark-jobs
+
+  spark-worker-1:
+    image: apache/spark:3.5.1
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
     environment:
       SPARK_MODE: worker
       SPARK_MASTER_URL: spark://spark-master:7077

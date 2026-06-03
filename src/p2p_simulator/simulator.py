@@ -97,6 +97,7 @@ class P2PSimulator:
         n_peers: int = 10,
         events_per_second: float = 5.0,
         mode: str = "normal",
+        use_kafka: bool = False,
     ):
         self.n_peers = n_peers
         self.events_per_second = events_per_second
@@ -108,7 +109,11 @@ class P2PSimulator:
         self.redis = redis.from_url(REDIS_URL, decode_responses=True)
 
         # Phase 2 — Kafka producer
-        self.kafka_producer = Producer({"bootstrap.servers": KAFKA_BOOTSTRAP})
+        self.kafka_producer = Producer({
+            "bootstrap.servers": "localhost:29092",
+            "acks": "all",
+            "enable.idempotence": True,
+        }) if use_kafka else None
 
         # Peers actifs simulés
         self.active_peers = [str(uuid.uuid4()) for _ in range(n_peers)]
@@ -215,20 +220,23 @@ class P2PSimulator:
         except Exception as e:
             logger.error("Redis indisponible, event ignoré : %s", e)
 
+    def _delivery_report(self, err, msg):
+        """Callback de confirmation de livraison Kafka."""
+        if err is not None:
+            logger.error("Echec livraison Kafka : %s", err)
+
     def _publish_to_kafka(self, topic: str, key: str, payload: str):
         """
         Publication asynchrone avec callback.
         """
         try:
-            # Produce asynchronously
-            self.producer.produce(
+            self.kafka_producer.produce(
                 topic=topic,
                 key=key,
                 value=payload,
                 callback=self._delivery_report
             )
-            # Serve delivery reports from previous produce calls
-            self.producer.poll(0)
+            self.kafka_producer.poll(0)
         except Exception as e:
             print(f"Failed to publish to Kafka: {e}")
 
@@ -249,12 +257,13 @@ def main():
     parser.add_argument("--mode",   type=str,   default="normal",
                         choices=["normal", "fraud", "late_events", "chaos"],
                         help="Mode de simulation")
+    parser.add_argument("--kafka", action="store_true", help="Activer la publication Kafka")
     args = parser.parse_args()
-
     simulator = P2PSimulator(
         n_peers=args.peers,
         events_per_second=args.rate,
         mode=args.mode,
+        use_kafka=args.kafka,
     )
     simulator.run()
 

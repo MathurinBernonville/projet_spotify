@@ -21,6 +21,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Optional
 from confluent_kafka import Producer
+import psycopg2
 
 import redis
 

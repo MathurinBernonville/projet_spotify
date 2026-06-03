@@ -23,11 +23,10 @@ import time
 import uuid
 from datetime import datetime, timedelta
 from typing import Optional
+from confluent_kafka import Producer
 
 import redis
 
-# Phase 2 — décommenter quand Kafka est prêt
-# from confluent_kafka import Producer
 
 logging.basicConfig(
     level=logging.INFO,
@@ -97,7 +96,7 @@ class P2PSimulator:
         self.redis = redis.from_url(REDIS_URL, decode_responses=True)
 
         # Phase 2 — Kafka producer
-        # self.kafka_producer = Producer({"bootstrap.servers": KAFKA_BOOTSTRAP})
+        self.kafka_producer = Producer({"bootstrap.servers": KAFKA_BOOTSTRAP})
 
         # Peers actifs simulés
         self.active_peers = [str(uuid.uuid4()) for _ in range(n_peers)]
@@ -217,8 +216,9 @@ class P2PSimulator:
         channel = TOPICS[topic_key]
 
         self._publish_to_redis(channel, payload)
+
         # Phase 2 — décommenter
-        # self._publish_to_kafka(channel, event.get("user_id", ""), payload)
+        self._publish_to_kafka(channel, event.get("user_id", ""), payload)
 
     def _publish_to_redis(self, channel: str, payload: str):
         """
@@ -228,14 +228,22 @@ class P2PSimulator:
         """
         raise NotImplementedError("TODO : implémenter _publish_to_redis()")
 
-    # def _publish_to_kafka(self, topic: str, key: str, payload: str):
-    #     """
-    #     TODO Phase 2 : publier payload dans le topic Kafka.
-    #     - key     : utilisé pour le partitionnement (user_id ou peer_id)
-    #     - acks    : 'all' pour la durabilité
-    #     - Gérer le callback de confirmation (delivery_report)
-    #     """
-    #     raise NotImplementedError("TODO Phase 2 : implémenter _publish_to_kafka()")
+    def _publish_to_kafka(self, topic: str, key: str, payload: str):
+        """
+        Publication asynchrone avec callback.
+        """
+        try:
+            # Produce asynchronously
+            self.producer.produce(
+                topic=topic,
+                key=key,
+                value=payload,
+                callback=self._delivery_report
+            )
+            # Serve delivery reports from previous produce calls
+            self.producer.poll(0)
+        except Exception as e:
+            print(f"Failed to publish to Kafka: {e}")
 
     def _shutdown(self, signum, frame):
         logger.info(f"Arrêt du simulateur (signal {signum}) — {self.event_count} événements publiés")

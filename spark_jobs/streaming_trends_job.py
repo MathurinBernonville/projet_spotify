@@ -6,27 +6,33 @@ les tendances musicales temps réel.
 """
 
 import os
+import json
+import psycopg2
+import redis as redis_lib
+
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import (
     StructType, StructField,
-    StringType, IntegerType, BooleanType, TimestampType
+    StringType, IntegerType, BooleanType
 )
 
 # ─────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────
 
-KAFKA_BOOTSTRAP  = os.getenv("KAFKA_BOOTSTRAP",  "kafka-1:9092")
+
 KAFKA_TOPIC      = "listening_events"
 CHECKPOINT_PATH  = "/tmp/checkpoints/streaming_trends"
-POSTGRES_URL     = os.getenv("SPOTIFY_POSTGRES_URL",
-                             "jdbc:postgresql://postgres:5432/spotify")
+KAFKA_BOOTSTRAP  = os.getenv("KAFKA_BOOTSTRAP",  "172.19.0.11:9092")
+POSTGRES_URL     = os.getenv("SPOTIFY_POSTGRES_URL", "jdbc:postgresql://172.19.0.4:5432/spotify")
+REDIS_URL        = "redis://172.19.0.3:6379/1"
 POSTGRES_PROPS   = {
     "user":     "spotify",
     "password": "spotify",
     "driver":   "org.postgresql.Driver",
 }
+
 
 # ─────────────────────────────────────────────────────────────
 # SCHÉMA DES ÉVÉNEMENTS D'ÉCOUTE
@@ -56,12 +62,6 @@ def create_spark_session() -> SparkSession:
         .appName("SPOTIFY-streaming-trends")
         .config("spark.sql.shuffle.partitions", "6")
         .config("spark.streaming.stopGracefullyOnShutdown", "true")
-        .config("spark.hadoop.fs.s3a.endpoint",          "http://minio:9000")
-        .config("spark.hadoop.fs.s3a.access.key",        "minioadmin")
-        .config("spark.hadoop.fs.s3a.secret.key",        "minioadmin")
-        .config("spark.hadoop.fs.s3a.path.style.access", "true")
-        .config("spark.hadoop.fs.s3a.impl",
-                "org.apache.hadoop.fs.s3a.S3AFileSystem")
         .getOrCreate()
     )
 
@@ -71,10 +71,7 @@ def create_spark_session() -> SparkSession:
 # ─────────────────────────────────────────────────────────────
 
 def read_kafka_stream(spark: SparkSession):
-    """
-    Lit le topic Kafka listening_events en streaming.
-    Parse le JSON et caste le timestamp en event_time.
-    """
+    """Lit le topic Kafka listening_events en streaming."""
     raw_df = (
         spark.readStream
         .format("kafka")
@@ -85,7 +82,6 @@ def read_kafka_stream(spark: SparkSession):
         .load()
     )
 
-    # Caster la value bytes en string puis parser le JSON
     parsed_df = (
         raw_df
         .select(F.col("value").cast("string").alias("json_value"))
@@ -104,7 +100,8 @@ def read_kafka_stream(spark: SparkSession):
 
 def compute_top_tracks_tumbling(events_df):
     """
-    Top tracks par tumbling window de 5 minutes — sink console pour test.
+    Top tracks par tumbling window de 5 minutes.
+    Écriture dans PostgreSQL via foreachBatch.
     """
     top_tracks_df = (
         events_df
@@ -117,17 +114,118 @@ def compute_top_tracks_tumbling(events_df):
             F.count("*").alias("stream_count"),
             F.approx_count_distinct("user_id").alias("unique_listeners"),
         )
-        .orderBy(F.col("stream_count").desc())
     )
+
+    def write_to_postgres(batch_df, batch_id):
+        rows = batch_df.collect()
+        if not rows:
+            return
+        try:
+            conn = psycopg2.connect(
+                host="postgres", port=5432,
+                dbname="spotify", user="spotify", password="spotify"
+            )
+            cursor = conn.cursor()
+            for row in rows:
+                cursor.execute("""
+                    INSERT INTO realtime_top_tracks
+                        (window_start, window_end, track_id, stream_count, unique_listeners)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (window_start, track_id) DO UPDATE SET
+                        stream_count     = EXCLUDED.stream_count,
+                        unique_listeners = EXCLUDED.unique_listeners,
+                        updated_at       = NOW()
+                """, (
+                    row["window"]["start"],
+                    row["window"]["end"],
+                    row["track_id"],
+                    row["stream_count"],
+                    row["unique_listeners"],
+                ))
+            conn.commit()
+            cursor.close()
+            conn.close()
+            print(f"Batch {batch_id} : {len(rows)} tracks insérés dans realtime_top_tracks")
+        except Exception as e:
+            print(f"Erreur PostgreSQL batch {batch_id} : {e}")
 
     query = (
         top_tracks_df.writeStream
         .outputMode("complete")
-        .format("console")
-        .option("truncate", False)
-        .option("numRows", 10)
-        .option("checkpointLocation", CHECKPOINT_PATH + "/console")
-        .trigger(processingTime="10 seconds")
+        .foreachBatch(write_to_postgres)
+        .option("checkpointLocation", CHECKPOINT_PATH + "/top_tracks")
+        .trigger(processingTime="30 seconds")
+        .start()
+    )
+
+    return query
+
+
+def compute_genre_listeners_sliding(events_df, spark):
+    """
+    Listeners uniques par genre en sliding window (15 min / 5 min).
+    Jointure stream-static avec catalogue PostgreSQL.
+    Écriture dans Redis.
+    """
+    # Chargement statique du catalogue
+    catalog_df = spark.read.jdbc(
+        POSTGRES_URL,
+        "tracks",
+        properties=POSTGRES_PROPS
+    ).select(
+        F.col("id").cast("string").alias("track_id"),
+        F.col("genre")
+    )
+
+    # Jointure stream-static
+    enriched_df = events_df.join(
+        F.broadcast(catalog_df),
+        on="track_id",
+        how="left"
+    )
+
+    # Sliding window 15 min / slide 5 min
+    genre_df = (
+        enriched_df
+        .filter(F.col("genre").isNotNull())
+        .groupBy(
+            F.window(F.col("event_time"), "15 minutes", "5 minutes"),
+            F.col("genre")
+        )
+        .agg(
+            F.approx_count_distinct("user_id").alias("unique_listeners"),
+            F.count("*").alias("stream_count"),
+        )
+    )
+
+    def write_to_redis(batch_df, batch_id):
+        rows = batch_df.collect()
+        if not rows:
+            return
+        try:
+            r = redis_lib.from_url(REDIS_URL, decode_responses=True)
+            genre_data = {}
+            for row in rows:
+                genre = row["genre"]
+                if genre not in genre_data or row["unique_listeners"] > genre_data[genre]["unique_listeners"]:
+                    genre_data[genre] = {
+                        "genre": genre,
+                        "unique_listeners": row["unique_listeners"],
+                        "stream_count": row["stream_count"],
+                        "window_start": str(row["window"]["start"]),
+                        "window_end": str(row["window"]["end"]),
+                    }
+            r.set("genre_listeners:live", json.dumps(genre_data), ex=3600)
+            print(f"Batch {batch_id} : {len(genre_data)} genres écrits dans Redis")
+        except Exception as e:
+            print(f"Erreur Redis batch {batch_id} : {e}")
+
+    query = (
+        genre_df.writeStream
+        .outputMode("complete")
+        .foreachBatch(write_to_redis)
+        .option("checkpointLocation", CHECKPOINT_PATH + "/genres")
+        .trigger(processingTime="30 seconds")
         .start()
     )
 
@@ -148,6 +246,7 @@ def main():
 
     events_df = read_kafka_stream(spark)
     query_top_tracks = compute_top_tracks_tumbling(events_df)
+    query_genres = compute_genre_listeners_sliding(events_df, spark)
 
     spark.streams.awaitAnyTermination()
 

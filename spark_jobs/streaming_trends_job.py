@@ -21,18 +21,17 @@ from pyspark.sql.types import (
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────
 
-
+KAFKA_BOOTSTRAP  = os.getenv("KAFKA_BOOTSTRAP",  "172.19.0.8:9092")
 KAFKA_TOPIC      = "listening_events"
 CHECKPOINT_PATH  = "/tmp/checkpoints/streaming_trends"
-KAFKA_BOOTSTRAP  = os.getenv("KAFKA_BOOTSTRAP",  "172.19.0.11:9092")
-POSTGRES_URL     = os.getenv("SPOTIFY_POSTGRES_URL", "jdbc:postgresql://172.19.0.4:5432/spotify")
-REDIS_URL        = "redis://172.19.0.3:6379/1"
+POSTGRES_URL     = os.getenv("SPOTIFY_POSTGRES_URL",
+                             "jdbc:postgresql://172.19.0.4:5432/spotify")
 POSTGRES_PROPS   = {
     "user":     "spotify",
     "password": "spotify",
     "driver":   "org.postgresql.Driver",
 }
-
+REDIS_URL = "redis://172.19.0.3:6379/1"
 
 # ─────────────────────────────────────────────────────────────
 # SCHÉMA DES ÉVÉNEMENTS D'ÉCOUTE
@@ -71,7 +70,10 @@ def create_spark_session() -> SparkSession:
 # ─────────────────────────────────────────────────────────────
 
 def read_kafka_stream(spark: SparkSession):
-    """Lit le topic Kafka listening_events en streaming."""
+    """
+    Lit le topic Kafka listening_events en streaming.
+    Parse le JSON, caste le timestamp en event_time et applique le watermark.
+    """
     raw_df = (
         spark.readStream
         .format("kafka")
@@ -89,6 +91,7 @@ def read_kafka_stream(spark: SparkSession):
         .select("data.*")
         .withColumn("event_time", F.to_timestamp(F.col("timestamp")))
         .drop("timestamp")
+        .withWatermark("event_time", "10 minutes")
     )
 
     return parsed_df
@@ -122,7 +125,7 @@ def compute_top_tracks_tumbling(events_df):
             return
         try:
             conn = psycopg2.connect(
-                host="postgres", port=5432,
+                host="172.19.0.4", port=5432,
                 dbname="spotify", user="spotify", password="spotify"
             )
             cursor = conn.cursor()
@@ -151,7 +154,7 @@ def compute_top_tracks_tumbling(events_df):
 
     query = (
         top_tracks_df.writeStream
-        .outputMode("complete")
+        .outputMode("update")
         .foreachBatch(write_to_postgres)
         .option("checkpointLocation", CHECKPOINT_PATH + "/top_tracks")
         .trigger(processingTime="30 seconds")
@@ -167,7 +170,6 @@ def compute_genre_listeners_sliding(events_df, spark):
     Jointure stream-static avec catalogue PostgreSQL.
     Écriture dans Redis.
     """
-    # Chargement statique du catalogue
     catalog_df = spark.read.jdbc(
         POSTGRES_URL,
         "tracks",
@@ -177,14 +179,12 @@ def compute_genre_listeners_sliding(events_df, spark):
         F.col("genre")
     )
 
-    # Jointure stream-static
     enriched_df = events_df.join(
         F.broadcast(catalog_df),
         on="track_id",
         how="left"
     )
 
-    # Sliding window 15 min / slide 5 min
     genre_df = (
         enriched_df
         .filter(F.col("genre").isNotNull())
@@ -222,9 +222,51 @@ def compute_genre_listeners_sliding(events_df, spark):
 
     query = (
         genre_df.writeStream
-        .outputMode("complete")
+        .outputMode("update")
         .foreachBatch(write_to_redis)
         .option("checkpointLocation", CHECKPOINT_PATH + "/genres")
+        .trigger(processingTime="30 seconds")
+        .start()
+    )
+
+    return query
+
+
+def route_late_events(events_df):
+    """
+    Route les late events vers le topic Kafka late_listening_events.
+    Un event est tardif si son event_time est antérieur de plus de 10 minutes.
+    """
+    late_df = (
+        events_df
+        .filter(
+            F.col("event_time") < (F.current_timestamp() - F.expr("INTERVAL 10 MINUTES"))
+        )
+    )
+
+    def send_to_kafka(batch_df, batch_id):
+        rows = batch_df.collect()
+        if not rows:
+            return
+        try:
+            from confluent_kafka import Producer
+            producer = Producer({
+                "bootstrap.servers": KAFKA_BOOTSTRAP,
+                "enable.idempotence": True,
+            })
+            for row in rows:
+                payload = json.dumps(row.asDict(), default=str)
+                producer.produce("late_listening_events", value=payload.encode("utf-8"))
+            producer.flush()
+            print(f"Batch {batch_id} : {len(rows)} late events routés vers late_listening_events")
+        except Exception as e:
+            print(f"Erreur Kafka late events batch {batch_id} : {e}")
+
+    query = (
+        late_df.writeStream
+        .outputMode("append")
+        .foreachBatch(send_to_kafka)
+        .option("checkpointLocation", CHECKPOINT_PATH + "/late_events")
         .trigger(processingTime="30 seconds")
         .start()
     )
@@ -246,7 +288,8 @@ def main():
 
     events_df = read_kafka_stream(spark)
     query_top_tracks = compute_top_tracks_tumbling(events_df)
-    query_genres = compute_genre_listeners_sliding(events_df, spark)
+    query_genres     = compute_genre_listeners_sliding(events_df, spark)
+    query_late       = route_late_events(events_df)
 
     spark.streams.awaitAnyTermination()
 

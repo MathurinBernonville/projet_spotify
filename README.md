@@ -1,5 +1,7 @@
 Spotify Data Platform — Groupe P
 Plateforme de streaming musical distribuée construite dans le cadre du Master 1 Data & IA (HETIC 2026).
+
+
 Architecture
 Simulateur P2P (Python)
 │

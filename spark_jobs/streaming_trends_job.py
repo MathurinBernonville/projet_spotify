@@ -23,7 +23,7 @@ from pyspark.sql.types import (
 
 KAFKA_BOOTSTRAP  = os.getenv("KAFKA_BOOTSTRAP",  "172.19.0.8:9092")
 KAFKA_TOPIC      = "listening_events"
-CHECKPOINT_PATH  = "/tmp/checkpoints/streaming_trends"
+CHECKPOINT_PATH = "s3a://spotify-checkpoints/streaming_trends"
 POSTGRES_URL     = os.getenv("SPOTIFY_POSTGRES_URL",
                              "jdbc:postgresql://172.19.0.4:5432/spotify")
 POSTGRES_PROPS   = {
@@ -61,6 +61,12 @@ def create_spark_session() -> SparkSession:
         .appName("SPOTIFY-streaming-trends")
         .config("spark.sql.shuffle.partitions", "6")
         .config("spark.streaming.stopGracefullyOnShutdown", "true")
+        .config("spark.hadoop.fs.s3a.endpoint",          "http://172.19.0.5:9000")
+        .config("spark.hadoop.fs.s3a.access.key",        "minioadmin")
+        .config("spark.hadoop.fs.s3a.secret.key",        "minioadmin")
+        .config("spark.hadoop.fs.s3a.path.style.access", "true")
+        .config("spark.hadoop.fs.s3a.impl",              "org.apache.hadoop.fs.s3a.S3AFileSystem")
+        .config("spark.hadoop.fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider")
         .getOrCreate()
     )
 
